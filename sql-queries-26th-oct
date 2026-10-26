@@ -1,0 +1,75 @@
+SELECT * FROM orders; -- all the rows of orders table.
+
+SELECT * FROM support_cases;
+
+SELECT COUNT(*) FROM orders;
+
+SELECT COUNT(*) FROM support_cases;
+
+-- where clause is used to filter rows on a particular condition.
+select * from orders where order_id = 'MR-501';
+
+select * from orders where payment_status = 'PAID';
+
+select * from human_reviews where case_id = 'MCS-502';
+
+
+-- Get all the orders which were placed after 15th March, 2026
+select * from orders where order_date > '2026-03-15';
+
+SELECT COUNT(*) FROM orders; -- Count of all the orders.
+
+-- Get the count of all the orders which haven't been delivered yet.
+-- order not delivered means delivery_date is Null.
+
+select COUNT(*) from orders where delivery_date IS null;
+
+-- ORDER BY
+
+select * from support_cases order by received_at desc;
+
+-- give the order_id, product, order_date and delivery_date of each order.
+select order_id, product, order_date, delivery_date 
+from orders
+where delivery_date is null
+order by order_id
+limit 5;
+
+
+-- select * from students order by marks; default order is ascending 
+
+
+-- Get all the pending cases which are of type delivery or billing
+select * from support_cases
+where review_status = 'PENDING'
+AND (case_type = 'DELIVERY' or case_type = 'BILLING');
+
+select * from support_cases
+where review_status = 'PENDING'
+AND case_type IN ('DELIVERY', 'BILLING', 'DAMAGE');
+
+
+select * from support_cases;
+
+-- Get all the cases in which customer question contains the word refund.
+select * from support_cases
+where customer_question LIKE '%package%';
+
+-- % -> any number of characters.
+-- _ -> exactly one occurrence 
+
+
+select * from human_reviews;
+
+select * from human_reviews where case_id = 'MCS-000767';
+
+select COUNT(*) from human_reviews;
+
+select COUNT(DISTINCT case_id) from human_reviews;
+
+
+-- (5 + 6) * 2
+-- 5 + (6 * 2)
+
+-- (cond1 and cond2) or cond3
+-- cond1 and (cond2 or cond3)
