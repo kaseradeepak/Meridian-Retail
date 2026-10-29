@@ -1,0 +1,162 @@
+-- Q: Total number of cases reviewed by humans.
+-- from the human_reviews table, only consider the distinct cases.
+select COUNT(DISTINCT case_id) as reviewed_cases from human_reviews;
+
+select * from human_reviews where decision is null;
+
+select 
+COUNT(*) as total_events,
+COUNT(DISTINCT case_id) as reviewed_cases 
+from human_reviews;
+
+select *
+from human_reviews;
+
+-- Give total number of cases reviewed per decision.
+-- approved - 100
+-- rejected - 459
+-- escalated - 200
+
+-- create groups based on decision value.
+-- GROUP BY
+
+select decision, count(distinct case_id) as review_cases
+from human_reviews
+group by decision;
+
+-- Q: Which products have more than 1200 orders?
+
+select * from orders;
+
+-- number of orders per product.
+
+select product as product_name, 
+count(*) as number_of_orders
+from orders
+group by product
+HAVING number_of_orders > 1200;
+
+-- Error Code: 1111. Invalid use of group function
+
+-- where clause is used to filter rows.
+-- where clause can't be used with group.
+-- To filter groups, we need to use HAVING clause.
+
+-- where : filter rows.
+-- having : filter groups.
+
+select product as product_name, 
+count(*) as number_of_orders,
+payment_status
+from orders
+group by product
+HAVING number_of_orders > 1000
+order by number_of_orders desc;
+
+-- Error Code: 1055. Expression #3 of 
+-- SELECT list is not in GROUP BY clause and contains nonaggregated column 
+-- 'meridian_retail.orders.payment_status' which is not functionally 
+-- dependent on columns in GROUP BY clause; this is incompatible 
+-- with sql_mode=only_full_group_by
+
+select * FROM human_reviews;
+
+SELECT reviewer_role,
+       COUNT(*) AS review_events,
+       MIN(handling_minutes) AS fastest_minutes,
+       MAX(handling_minutes) AS slowest_minutes,
+       ROUND(AVG(handling_minutes), 2) AS average_minutes
+FROM human_reviews
+GROUP BY reviewer_role
+ORDER BY average_minutes DESC, reviewer_role;
+
+-- CRUD
+-- Create, Read, Update, Delete.
+
+select * from orders;
+
+update orders
+set product = 'iphone 17'
+where order_id = 'MR-000008';
+
+-- Error Code: 1175. You are using safe update mode 
+-- and you tried to update a table without a WHERE that uses a KEY column.  
+-- To disable safe mode, toggle the option in Preferences -> SQL Editor and reconnect.
+
+delete from orders
+where order_id = 'MR-000558';
+
+-- We should never update or delete anything from the database without a where clause.
+
+-- SET SQL_SAFE_UPDATES = 0;
+
+-------------- JOIN Queries ------------------
+
+SELECT support_cases.case_id, review_status, review_id, decision
+FROM support_cases
+INNER JOIN human_reviews
+ON human_reviews.case_id = support_cases.case_id;
+
+-- Error Code: 1052. Column 'case_id' in field list is ambiguous
+
+SELECT sc.case_id, review_status, review_id, decision
+FROM support_cases sc
+INNER JOIN human_reviews hr
+ON hr.case_id = sc.case_id
+where sc.case_id = 'MCS-000005';
+
+-- Error Code: 1052. Column 'case_id' in where clause is ambiguous
+
+
+SELECT sc.case_id, review_status, review_id, decision
+FROM support_cases sc
+INNER JOIN human_reviews hr
+ON hr.case_id = sc.case_id
+where sc.case_id IN ('MCS-501', 'MCS-502')
+order by sc.case_id;
+
+SELECT sc.case_id, sc.review_status, hr.review_id, hr.decision
+FROM support_cases sc
+LEFT JOIN human_reviews hr
+ON hr.case_id = sc.case_id
+WHERE sc.case_id IN ('MCS-501', 'MCS-502')
+ORDER BY sc.case_id;
+
+select count(*) from issue_records;
+
+select count(*) from human_reviews;
+
+SELECT 
+COUNT(*) AS total_joined_rows,
+COUNT(distinct hr.case_id) AS reviewed_cases
+FROM issue_records AS ir
+INNER JOIN human_reviews AS hr
+ON hr.case_id = ir.case_id;
+
+
+select count(*) from support_cases;
+
+select 
+count(*) as total_join_rows, -- 27000 
+count(distinct sc.case_id) as total_cases,
+count(hr.review_id) as reviewed_events
+from support_cases sc
+left join human_reviews hr
+on sc.case_id = hr.case_id;
+
+-- Show me all 25,000 cases. Where a case has a review that names a validation rule, attach that review.
+
+select count(*) as rows_returned
+from support_cases sc
+left join human_reviews hr
+on sc.case_id = hr.case_id
+where hr.triggered_rule_id IS NOT NULL;
+
+
+select count(distinct sc.case_id) as rows_returned,
+count(hr.review_id) as review_id
+from support_cases sc
+left join human_reviews hr
+on sc.case_id = hr.case_id AND hr.triggered_rule_id IS NOT NULL;
+
+--  if we want the validation rule name as well then consider joining with validation_rules table.alter
