@@ -1,0 +1,122 @@
+use meridian_retail;
+
+select * from issue_records
+where case_id = 'MCS-000001';
+
+select * from human_reviews
+where case_id = 'MCS-000001';
+
+INSERT INTO issue_records
+    (issue_id, case_id, issue_type, issue_details,
+     reported_delivery_date, evidence_status, extract_generated_at)
+VALUES
+    ('ISS-DEMO-000001', 'MCS-000001', 'MISSING_ITEM',
+     'Hypothetical second issue for the classroom demonstration.',
+     NULL, 'PENDING_PROOF', '2026-09-18 11:40:00');
+
+
+SELECT ir.issue_id, hr.review_id, hr.handling_minutes
+FROM issue_records AS ir
+JOIN human_reviews AS hr 
+ON hr.case_id = ir.case_id
+where ir.case_id = 'MCS-000001';
+
+
+SELECT SUM(hr.handling_minutes) AS joined_handling_minutes
+FROM issue_records AS ir
+JOIN human_reviews AS hr 
+ON hr.case_id = ir.case_id
+WHERE ir.case_id = 'MCS-000001';
+
+SELECT SUM(handling_minutes) AS actual_review_minutes
+FROM human_reviews WHERE case_id = 'MCS-000001';
+
+WITH issue_summary AS (
+    SELECT case_id, COUNT(*) AS issue_count
+    FROM issue_records
+    GROUP BY case_id
+), review_summary AS (
+    SELECT case_id, COUNT(*) AS review_count,
+           SUM(handling_minutes) AS total_handling_minutes
+    FROM human_reviews
+    GROUP BY case_id
+)
+SELECT sc.case_id,
+       COALESCE(i.issue_count, 0) AS issue_count,
+       COALESCE(r.review_count, 0) AS review_count,
+       r.total_handling_minutes
+FROM support_cases AS sc
+LEFT JOIN issue_summary AS i ON i.case_id = sc.case_id
+LEFT JOIN review_summary AS r ON r.case_id = sc.case_id
+WHERE sc.case_id = 'MCS-000001';
+
+-- COALESCE: fallback function
+-- COALESCE(fx, some_value) => if fx is NULL, then take some_value.
+
+select * from human_reviews
+where review_id = 'MHR-000100';
+
+update human_reviews
+set decision = 'APPROVED'
+where review_id = 'MHR-000010';
+
+-- autocommit
+
+SELECT @@autocommit;
+
+SET @@autocommit = 0;
+
+start transaction;
+
+select * from human_reviews
+where review_id = 'MHR-000100';
+
+update human_reviews
+set decision = 'NEEDS_INFO'
+where review_id = 'MHR-000100';
+
+commit;
+rollback;
+
+-- VIEW 
+
+CREATE VIEW sample_view as 
+select distinct sc.case_id as rows_returned,
+hr.review_id as review_id, 
+hr.triggered_rule_id as rule_id,
+vr.condition_text as rule_inforows_returnedreview_id
+from support_cases sc
+left join human_reviews hr
+on sc.case_id = hr.case_id AND hr.triggered_rule_id IS NOT NULL
+join -- inner join is the default join.
+validation_rules vr
+on hr.triggered_rule_id = vr.rule_id;
+
+
+select * from sample_view; -- 3564 rows
+
+-- update sample_view
+-- set rule_id = 'VR-001' 
+-- where review_id = 'MHR-000009';
+
+-- Error Code: 1288. The target table sample_view of the UPDATE is not updatable
+
+create view sample_view_2 as
+SELECT ir.issue_id, hr.review_id, hr.handling_minutes
+FROM issue_records AS ir
+JOIN human_reviews AS hr 
+ON hr.case_id = ir.case_id
+where ir.case_id = 'MCS-000001';
+
+select * from human_reviews
+where case_id = 'MCS-000001';
+
+update human_reviews
+set handling_minutes = 270
+where case_id = 'MCS-000001' and reviewer_role = 'PAYMENTS_SPECIALIST';
+
+update human_reviews
+set handling_minutes = 650
+where case_id = 'MCS-000001' and reviewer_role = 'OPERATIONS_REVIEWER';
+
+select * from sample_view_2;
