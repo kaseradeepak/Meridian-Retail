@@ -1,0 +1,200 @@
+select distinct sc.case_id as rows_returned,
+hr.review_id as review_id, hr.triggered_rule_id as rule_id
+from support_cases sc
+left join human_reviews hr
+on sc.case_id = hr.case_id AND hr.triggered_rule_id IS NOT NULL;
+
+select * from validation_rules;
+
+select distinct sc.case_id as rows_returned,
+hr.review_id as review_id, 
+hr.triggered_rule_id as rule_id,
+vr.condition_text as rule_info
+from support_cases sc
+left join human_reviews hr
+on sc.case_id = hr.case_id AND hr.triggered_rule_id IS NOT NULL
+join -- inner join is the default join.
+validation_rules vr
+on hr.triggered_rule_id = vr.rule_id;
+
+SELECT COUNT(*) AS review_events, -- 10000
+       COUNT(triggered_rule_id) AS events_with_rule, -- 3564
+       COUNT(*) - COUNT(triggered_rule_id) AS events_without_rule -- 10000 - 3564
+FROM human_reviews;
+
+
+-- Which cases has nobody reviewed yet?
+
+-- select *
+-- from support_cases sc
+-- where case_id is not in (get all the case_id in human reviews table)
+
+-- list_of_case_ids = get all the case_ids from human reviews table
+
+-- select *
+-- from support_cases
+-- where case_id NOT IN list_of_case_ids
+
+SELECT sc.case_id, sc.case_type, sc.review_status
+FROM support_cases AS sc
+WHERE NOT EXISTS (
+		SELECT 1
+		FROM human_reviews AS hr
+		WHERE hr.case_id = sc.case_id
+);
+
+SELECT COUNT(*) AS cases_without_review
+FROM support_cases AS sc
+WHERE EXISTS (
+  SELECT 1
+  FROM human_reviews AS hr
+  WHERE hr.case_id = sc.case_id
+);
+
+ SELECT DISTINCT case_id
+  FROM human_reviews;
+
+
+--  WITH keyword allows us to write the rough work and give it some name, 
+--  this named result is called as CTE (Common Table Expression)
+--  a CTE doesn't get stored in the database, it is for temporary usage.
+WITH reviewed_case_ids AS (
+  SELECT DISTINCT case_id
+  FROM human_reviews
+)
+
+SELECT ir.issue_type,
+       COUNT(*) AS total_cases,
+       COUNT(rc.case_id) AS reviewed_cases
+FROM issue_records AS ir
+LEFT JOIN reviewed_case_ids AS rc
+  ON rc.case_id = ir.case_id
+GROUP BY ir.issue_type
+ORDER BY total_cases DESC, ir.issue_type;
+
+-- WITH keyword can hold for more than one step as well, separated by comma. 
+
+WITH reviewed_case_ids AS (
+  SELECT DISTINCT case_id
+  FROM human_reviews
+),
+issue_coverage AS (
+  SELECT ir.issue_type,
+         COUNT(*) AS total_cases,
+         COUNT(rc.case_id) AS reviewed_cases
+  FROM issue_records AS ir
+  LEFT JOIN reviewed_case_ids AS rc
+    ON rc.case_id = ir.case_id
+  GROUP BY ir.issue_type
+)
+SELECT issue_type, total_cases, reviewed_cases,
+       ROUND(100.0 * reviewed_cases / total_cases, 1) AS pct_reviewed
+FROM issue_coverage
+ORDER BY total_cases DESC, issue_type;
+
+WITH rule_usage AS (
+  SELECT triggered_rule_id, COUNT(*) AS review_events
+  FROM human_reviews
+  WHERE triggered_rule_id IS NOT NULL
+  GROUP BY triggered_rule_id
+)
+SELECT vr.rule_id, vr.failure_route, ru.review_events
+FROM validation_rules AS vr
+LEFT JOIN rule_usage AS ru
+  ON ru.triggered_rule_id = vr.rule_id
+ORDER BY vr.rule_id;
+
+
+select count(distinct case_id) from issue_records;
+
+select count(*) from issue_records;
+
+select * from issue_records; 
+
+-- where case_id = 'MCS-502';
+
+-- case_id is the PRIMARY KEY for issue_records table.
+
+INSERT INTO issue_records
+    (case_id, issue_type, issue_details, reported_delivery_date,
+     evidence_status, extract_generated_at)
+VALUES
+    ('MCS-502', 'MISSING_ITEM',
+     'Hypothetical second issue for the classroom demonstration.',
+     NULL, 'PENDING_PROOF', '2026-09-18 11:40:00');
+     
+-- Error Code: 1062. Duplicate entry 'MCS-502' for key 'issue_records.PRIMARY'
+
+-- issue_records should have it's own PRIMARY KEY.
+-- add a new column in issue_records table and make it a PRIMARY KEY
+-- case_id can be referred as a FOREIGN KEY
+
+-- create a backup table for issue_records
+
+CREATE TEMPORARY TABLE class9_original_issue_evidence AS
+SELECT case_id, issue_type, issue_details, reported_delivery_date,
+       evidence_status, extract_generated_at
+FROM issue_records;
+
+ALTER TABLE issue_records
+ADD COLUMN issue_id VARCHAR(16) NULL FIRST;
+
+SET SQL_SAFE_UPDATES = 1;
+
+UPDATE issue_records
+SET issue_id = CONCAT('ISS-', SUBSTRING(case_id, 5));
+
+-- Error Code: 1175. You are using safe update mode and you tried to update a table without a WHERE that uses a KEY column.  To disable safe mode, toggle the option in Preferences -> SQL Editor and reconnect.
+
+-- Error Code: 1175. You are using safe update mode and you tried to update a table without a WHERE that uses a KEY column.  To disable safe mode, toggle the option in Preferences -> SQL Editor and reconnect.
+
+
+
+-- as of now, have we marked issue_id as the primary key ? => NO
+
+-- To add a new primary key, first we need to drop the existing pk and then
+-- make the pk.
+
+ALTER TABLE issue_records
+ADD INDEX idx_issue_records_case_id (case_id);
+
+ALTER TABLE issue_records
+DROP PRIMARY KEY,
+MODIFY issue_id VARCHAR(16) NOT NULL,
+ADD CONSTRAINT pk_issue_records PRIMARY KEY (issue_id);
+
+INSERT INTO issue_records
+    (issue_id, case_id, issue_type, issue_details, reported_delivery_date,
+     evidence_status, extract_generated_at)
+VALUES
+    ('ISS-129874', 'MCS-502', 'MISSING_ITEM',
+     'Hypothetical second issue for the classroom demonstration.',
+     NULL, 'PENDING_PROOF', '2026-09-18 11:40:00');
+     
+     INSERT INTO issue_records
+    (issue_id, case_id, issue_type, issue_details, reported_delivery_date,
+     evidence_status, extract_generated_at)
+VALUES
+    ('ISS-3894774', 'MCS-502', 'MISSING_ITEM',
+     'Hypothetical second issue for the classroom demonstration.',
+     NULL, 'PENDING_PROOF', '2026-09-18 11:40:00');
+
+select * from issue_records
+where case_id = 'MCS-502';
+
+select * from support_cases;
+
+explain select * from support_cases
+where case_id = 'MCS-000007';
+
+explain select * from support_cases
+where order_id = 'MR-001833';
+
+explain select * from support_cases
+where case_type = 'DAMAGE';
+
+select count(*) from support_cases
+where case_type = 'DAMAGE';
+
+ALTER TABLE support_cases
+ADD INDEX idx_support_cases_case_type (case_type);
