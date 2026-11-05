@@ -1,0 +1,78 @@
+select * from orders;
+
+select @@autocommit;
+
+select connection_id();
+
+-- default isolation level in MYSQL - repeatable read.
+
+select CONNECTION_ID() as connection_id,
+@@autocommit as auto_commit,
+@@transaction_isolation as transaction_isolation_level;
+
+SET @@session.transaction_isolation = 'READ-COMMITTED';
+
+SET @@session.transaction_isolation = 'SERIALIZABLE';
+
+-- T1
+start transaction;
+
+select * from orders
+where order_id = 'MR-000001';
+
+update orders
+set payment_status = 'PENDING'
+where order_id = 'MR-000001';
+
+commit;
+rollback;
+
+-- READ-UNCOMMITTED isolation level can lead to DIRTY READ problem.
+
+use meridian_retail;
+
+
+select @@autocommit;
+
+set @@autocommit = 0;
+
+select connection_id();
+
+select CONNECTION_ID() as connection_id,
+@@autocommit as auto_commit,
+@@transaction_isolation as transaction_isolation_level;
+
+-- SET @@session.transaction_isolation = 'READ-UNCOMMITTED';
+
+-- SET @@session.transaction_isolation = 'REPEATABLE-READ';
+
+SET @@session.transaction_isolation = 'SERIALIZABLE';
+
+-- Error Code: 2013. Lost connection to MySQL server during query : Timeout.
+
+
+-- T2
+start transaction;
+
+select * from orders
+where order_id = 'MR-000001'; 
+
+commit;
+rollback;
+
+use meridian_retail;
+
+select CONNECTION_ID() as connection_id,
+@@autocommit as auto_commit,
+@@transaction_isolation as transaction_isolation_level;
+
+SET @@session.transaction_isolation = 'READ-UNCOMMITTED';
+
+-- T3
+start transaction;
+
+select * from orders
+where order_id = 'MR-000056';
+
+commit;
+rollback;
