@@ -1,0 +1,176 @@
+select CONNECTION_ID() as connection_id,
+@@autocommit as auto_commit,
+@@transaction_isolation as transaction_isolation_level;
+
+SET @@session.transaction_isolation = 'REPEATABLE-READ';
+
+
+-- T1
+start transaction;
+
+select * from orders
+where order_id = 'MR-000001'
+for update;
+
+
+update orders
+set payment_status = 'FAILED'
+where order_id = 'MR-000002'; 
+
+select * from orders
+where order_id = 'MR-000002';
+
+commit;
+rollback;
+
+-- Indexing Demo
+
+SET @total_rows = 1000000;
+ 
+DROP DATABASE IF EXISTS indexing_demo;
+CREATE DATABASE indexing_demo;
+USE indexing_demo;
+
+
+CREATE TABLE customers (
+    customer_id    INT AUTO_INCREMENT PRIMARY KEY,
+    first_name     VARCHAR(50)   NOT NULL,
+    last_name      VARCHAR(50)   NOT NULL,
+    email          VARCHAR(120)  NOT NULL,
+    phone          VARCHAR(15),
+    gender         CHAR(1),               -- 'M' / 'F'
+    date_of_birth  DATE,
+    city           VARCHAR(50),
+    state          VARCHAR(50),
+    signup_date    DATETIME,
+    is_active      TINYINT(1),            -- 1 = active, 0 = inactive
+    total_spent    DECIMAL(10,2)
+);
+
+CREATE TABLE tmp_digits (d INT PRIMARY KEY);
+INSERT INTO tmp_digits VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9);
+ 
+CREATE TABLE tmp_first_names (id INT PRIMARY KEY, name VARCHAR(50), gender CHAR(1));
+INSERT INTO tmp_first_names VALUES
+ (1,'Aarav','M'),(2,'Vivaan','M'),(3,'Aditya','M'),(4,'Arjun','M'),(5,'Rohan','M'),
+ (6,'Karan','M'),(7,'Rahul','M'),(8,'Amit','M'),(9,'Vikram','M'),(10,'Siddharth','M'),
+ (11,'Ishaan','M'),(12,'Kabir','M'),(13,'Nikhil','M'),(14,'Manish','M'),(15,'Deepak','M'),
+ (16,'Suresh','M'),(17,'Rajesh','M'),(18,'Harsh','M'),(19,'Yash','M'),(20,'Varun','M'),
+ (21,'Ankit','M'),(22,'Pranav','M'),(23,'Gaurav','M'),(24,'Tushar','M'),(25,'Mohit','M'),
+ (26,'Ananya','F'),(27,'Diya','F'),(28,'Priya','F'),(29,'Sneha','F'),(30,'Pooja','F'),
+ (31,'Neha','F'),(32,'Kavya','F'),(33,'Isha','F'),(34,'Riya','F'),(35,'Meera','F'),
+ (36,'Aditi','F'),(37,'Shreya','F'),(38,'Nisha','F'),(39,'Swati','F'),(40,'Divya','F'),
+ (41,'Anjali','F'),(42,'Simran','F'),(43,'Tanvi','F'),(44,'Kriti','F'),(45,'Sakshi','F'),
+ (46,'Payal','F'),(47,'Ritu','F'),(48,'Megha','F'),(49,'Aisha','F'),(50,'Zara','F');
+ 
+CREATE TABLE tmp_last_names (id INT PRIMARY KEY, name VARCHAR(50));
+INSERT INTO tmp_last_names VALUES
+ (1,'Sharma'),(2,'Verma'),(3,'Gupta'),(4,'Singh'),(5,'Kumar'),
+ (6,'Patel'),(7,'Shah'),(8,'Mehta'),(9,'Joshi'),(10,'Reddy'),
+ (11,'Nair'),(12,'Iyer'),(13,'Rao'),(14,'Das'),(15,'Bose'),
+ (16,'Chatterjee'),(17,'Banerjee'),(18,'Mukherjee'),(19,'Agarwal'),(20,'Jain'),
+ (21,'Kapoor'),(22,'Malhotra'),(23,'Khanna'),(24,'Chopra'),(25,'Bhatia'),
+ (26,'Saxena'),(27,'Mishra'),(28,'Pandey'),(29,'Tiwari'),(30,'Yadav'),
+ (31,'Chauhan'),(32,'Thakur'),(33,'Kulkarni'),(34,'Deshpande'),(35,'Pillai'),
+ (36,'Menon'),(37,'Kasera'),(38,'Sinha'),(39,'Ghosh'),(40,'Khan');
+ 
+CREATE TABLE tmp_cities (id INT PRIMARY KEY, city VARCHAR(50), state VARCHAR(50));
+INSERT INTO tmp_cities VALUES
+ (1,'Mumbai','Maharashtra'),(2,'Pune','Maharashtra'),(3,'Nagpur','Maharashtra'),
+ (4,'Delhi','Delhi'),(5,'Bengaluru','Karnataka'),(6,'Mysuru','Karnataka'),
+ (7,'Hyderabad','Telangana'),(8,'Chennai','Tamil Nadu'),(9,'Coimbatore','Tamil Nadu'),
+ (10,'Kolkata','West Bengal'),(11,'Ahmedabad','Gujarat'),(12,'Surat','Gujarat'),
+ (13,'Jaipur','Rajasthan'),(14,'Udaipur','Rajasthan'),(15,'Lucknow','Uttar Pradesh'),
+ (16,'Noida','Uttar Pradesh'),(17,'Indore','Madhya Pradesh'),(18,'Bhopal','Madhya Pradesh'),
+ (19,'Chandigarh','Punjab'),(20,'Kochi','Kerala'),(21,'Thiruvananthapuram','Kerala'),
+ (22,'Bhubaneswar','Odisha'),(23,'Patna','Bihar'),(24,'Guwahati','Assam'),
+ (25,'Gurugram','Haryana');
+ 
+-- ---------------------------------------------------------------------
+-- 3. Generate rows
+--    Six cross-joined digit tables give numbers 1 .. 1,000,000.
+--    CRC32(...) acts as a repeatable "random" number so the data
+--    looks shuffled but is the same every time you run the script.
+-- ---------------------------------------------------------------------
+INSERT INTO customers
+    (first_name, last_name, email, phone, gender, date_of_birth,
+     city, state, signup_date, is_active, total_spent)
+SELECT
+    f.name,
+    l.name,
+    CONCAT(LOWER(f.name), '.', LOWER(l.name), s.n, '@',
+           ELT(1 + CRC32(CONCAT('d', s.n)) % 5,
+               'gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'rediffmail.com')),
+    CONCAT(ELT(1 + CRC32(CONCAT('p', s.n)) % 4, '9', '8', '7', '6'),
+           LPAD(CRC32(CONCAT('ph', s.n)) % 1000000000, 9, '0')),
+    f.gender,
+    DATE_ADD('1965-01-01', INTERVAL CRC32(CONCAT('b', s.n)) % 14600 DAY),   -- ~1965–2004
+    c.city,
+    c.state,
+    DATE_ADD('2018-01-01', INTERVAL CRC32(CONCAT('s', s.n)) % 276480000 SECOND), -- 2018 → ~2026
+    IF(CRC32(CONCAT('a', s.n)) % 10 < 8, 1, 0),                               -- ~80% active
+    ROUND((CRC32(CONCAT('t', s.n)) % 50000000) / 100, 2)                      -- ₹0 – ₹5,00,000
+FROM (
+    SELECT 1 + a.d + b.d*10 + c.d*100 + d.d*1000 + e.d*10000 + g.d*100000 AS n
+    FROM tmp_digits a, tmp_digits b, tmp_digits c,
+         tmp_digits d, tmp_digits e, tmp_digits g
+) s
+JOIN tmp_first_names f ON f.id = 1 + CRC32(CONCAT('f', s.n)) % 50
+JOIN tmp_last_names  l ON l.id = 1 + CRC32(CONCAT('l', s.n)) % 40
+JOIN tmp_cities      c ON c.id = 1 + CRC32(CONCAT('c', s.n)) % 25
+WHERE s.n <= @total_rows
+ORDER BY s.n;
+ 
+-- Clean up helper tables
+DROP TABLE tmp_digits, tmp_first_names, tmp_last_names, tmp_cities;
+ 
+-- Refresh table statistics so EXPLAIN shows accurate row estimates
+ANALYZE TABLE customers;
+
+select count(*) from customers;
+
+select * from customers
+limit 10;
+
+-- customers table has 1 Million (10 lakh) rows.
+
+EXPLAIN select * from customers
+where customer_id = 5;
+
+EXPLAIN ANALYZE select * from customers
+where email = 'nikhil.kumar2@outlook.com';
+
+-- '-> Filter: (customers.email = \'nikhil.kumar2@outlook.com\')  (cost=101248 rows=99382) (actual time=0.469..451 rows=1 loops=1)\n    -> Table scan on customers  (cost=101248 rows=993815) (actual time=0.455..418 rows=1e+6 loops=1)\n'
+
+
+select * from customers
+where email = 'nikhil.kumar2@outlook.com'; -- 0.433 sec = 433 ms
+
+
+-- '993815' rows
+-- lets create an index on email.
+
+create INDEX idx_email on customers(email);
+
+EXPLAIN ANALYZE select * from customers
+where email = 'nikhil.kumar2@outlook.com'; -- 0.0013 sec = 1.3 ms
+
+-- '-> Index lookup on customers using idx_email (email=\'nikhil.kumar2@outlook.com\')  (cost=0.666 rows=1) (actual time=0.153..0.156 rows=1 loops=1)\n'
+
+
+-- 1 row
+-- idx_email
+
+
+-- Indexing optimizes the read operations by reducing the number of disk accesses.
+
+EXPLAIN select * from customers
+where first_name = 'X' and last_name = 'Y';
+
+-- create an index on first_name & last_name
+
+EXPLAIN select * from customers
+where first_name = 'Nikhil' and customer_id = 10;
+
+select * from customers
+where col1 = .. and col2 = ..  and col3 = .. and col4 = ...;
